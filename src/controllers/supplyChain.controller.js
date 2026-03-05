@@ -3,6 +3,7 @@ import CollaborationRequest from '../models/collaborationRequest.model.js';
 import CollaborationChat from '../models/collaborationChat.model.js';
 import ProcessingCenter from '../models/processingCenter.model.js';
 import axios from 'axios';
+const ML_SERVER_URL = process.env.ML_SERVER_URL || "http://localhost:8000";
 
 // Ensure axios is available globally in this module if default import fails
 const _axios = axios;
@@ -152,16 +153,18 @@ export const updateRequestStatus = async (req, res) => {
         request.status = status;
 
         if (status === 'Accepted') {
-            // Check if chat already exists for this request (extra safety)
-            const existingChat = await CollaborationChat.findOne({ requestId: request._id });
-            if (existingChat) {
-                request.chatId = existingChat._id;
-                await request.save();
-                return res.status(200).json({ success: true, data: existingChat });
-            }
-
             // Mark the listing as Sold/Collaborated
             await SupplyChainListing.findByIdAndUpdate(request.listingId, { status: 'Sold' });
+
+            // Auto-reject other pending requests for the same listing
+            await CollaborationRequest.updateMany(
+                {
+                    listingId: request.listingId,
+                    _id: { $ne: request._id },
+                    status: 'Pending'
+                },
+                { status: 'Rejected' }
+            );
 
             // Create chat room
             const chat = await CollaborationChat.create({
@@ -264,7 +267,7 @@ export const getExternalProcessingCenters = async (req, res) => {
         }
 
         // 2. Call our Python Hybrid Service (Scraper + OSM)
-        const pythonServiceUrl = `http://localhost:8000/search-facilities?lat=${latitude}&lon=${longitude}&radius=${radius}${city ? `&city=${city}` : ''}`;
+        const pythonServiceUrl = `${ML_SERVER_URL}/search-facilities?lat=${latitude}&lon=${longitude}&radius=${radius}${city ? `&city=${city}` : ''}`;
 
         console.log(`[*] Fetching hybrid facilities from: ${pythonServiceUrl}`);
 

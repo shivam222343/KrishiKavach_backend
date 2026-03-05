@@ -21,9 +21,9 @@ export const getWeatherData = async (lat, lon, lang = 'en') => {
         daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max',
         // Set forecast days to 8 (today + next 7 days)
         forecast_days: 8,
-        timezone: 'auto', // Automatically detect timezone for accurate daily forecasts
-        language: lang     // Added to support language parameter from controller
+        timezone: 'auto' // Automatically detect timezone for accurate daily forecasts
       },
+      timeout: 10000 // 10 second timeout
     });
 
     return response.data;

@@ -11,14 +11,16 @@ export const getWeatherForFarmer = asyncHandler(async (req, res) => {
   const user = req.user;
 
   // Check if the user has a location stored in their profile
-  if (!user.location?.coordinates || user.location.coordinates.length !== 2) {
-    return res.status(400).json({ message: 'User location not found. Please update profile.' });
+  const coords = user.location?.coordinates;
+  if (!coords || !Array.isArray(coords) || coords.length !== 2 || isNaN(coords[0]) || isNaN(coords[1])) {
+    return res.status(400).json({ message: 'User location invalid or not found. Please update profile map.' });
   }
 
   // MongoDB GeoJSON stores coordinates as [Longitude, Latitude]
-  const [lon, lat] = user.location.coordinates;
-  
+  const [lon, lat] = coords;
+
   // Use the farmer's preferred language from their profile
+  // Open-Meteo standard forecast doesn't use 'language' param for data, but we keep lang for future logic
   const lang = user.language || 'en';
 
   // Call the service to get data from the external API

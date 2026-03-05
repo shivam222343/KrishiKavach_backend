@@ -719,7 +719,7 @@ Return ONLY a valid JSON object (no markdown, no code fences):
       "lastDate": "Real or estimated last date (e.g. 31 March 2026) in ${langName}",
       "websiteUrl": "Actual direct scheme application URL (not just portal)",
       "officialPortal": "Official government portal URL",
-      "imageUrl": "4-5 descriptive English keywords for a high-quality, professional image representing this scheme (e.g. 'modern solar panel farm field', 'indian woman farmer receiving gold coins', 'soil testing laboratory equipment', 'organic vegetable harvest indian farmer')",
+      "imageKeywords": "4-5 descriptive English keywords for a high-quality, professional image representing this scheme (e.g. 'modern solar panel farm field', 'indian woman farmer receiving gold coins', 'soil testing laboratory equipment', 'organic vegetable harvest indian farmer')",
       "tags": ["Subsidy", "Insurance", "Solar", "..." ],
       "relevanceReason": "Why this specific scheme is good for this farmer specifically in ${langName}"
     }

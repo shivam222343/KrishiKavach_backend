@@ -30,8 +30,8 @@ export const identifyCropWithAI = async (fileBuffer, mimeType) => {
   const gemini = createGeminiClient();
   if (gemini) {
     try {
-      console.log("[AI] Attempting identification with Gemini 1.5 Flash...");
-      const model = gemini.getGenerativeModel({ model: "gemini-1.5-flash" });
+      console.log("[AI] Attempting identification with Gemini 1.5 Flash Latest...");
+      const model = gemini.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
       const prompt = `
         Analyze this agricultural image. 
         Note: Ignore any human hands, fingers, or background objects. Focus ONLY on the plant leaf, fruit, or stalk.
@@ -108,8 +108,8 @@ export const analyzeCropDisease = async (images, cropInfo, language) => {
   const gemini = createGeminiClient();
   if (gemini) {
     try {
-      console.log("[AI] Analyzing disease with Gemini 1.5 Flash...");
-      const model = gemini.getGenerativeModel({ model: "gemini-1.5-flash" });
+      console.log("[AI] Analyzing disease with Gemini 1.5 Flash Latest...");
+      const model = gemini.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
       const imageParts = await Promise.all(images.map(async (file) => {
         const buffer = fs.readFileSync(file.path);
         return { inlineData: { data: buffer.toString("base64"), mimeType: "image/jpeg" } };

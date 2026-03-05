@@ -33,10 +33,12 @@ const app = express();
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
-  'https://krushikavach.netlify.app',
-  'https://krushikavach.netlify.app/',
+  'http://localhost:5173',
+  'http://localhost:5174',
   'https://krishi-kavach.netlify.app',
-  'https://krishi-kavach.netlify.app/'
+  'https://krishi-kavach.netlify.app/',
+  'https://krushikavach.netlify.app',
+  'https://krushikavach.netlify.app/'
 ];
 
 // --- Core Middleware ---

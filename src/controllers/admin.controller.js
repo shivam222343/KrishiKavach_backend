@@ -5,6 +5,7 @@ import AgronomistProfile from '../models/agronomistProfile.model.js';
 import ProcessingCenter from '../models/processingCenter.model.js';
 import Seed from '../models/seed.model.js';
 import Fertilizer from '../models/fertilizer.model.js';
+import DiseaseReport from '../models/diseaseReport.model.js';
 import { deleteFromCloudinary } from '../services/cloudinary.service.js';
 
 const removeMediaById = async (mediaId) => {
@@ -148,4 +149,43 @@ export const updateFertilizer = asyncHandler(async (req, res) => {
 export const deleteFertilizer = asyncHandler(async (req, res) => {
   await Fertilizer.findByIdAndDelete(req.params.id);
   res.json({ message: 'Fertilizer deleted' });
+});
+
+// --- Disease Outbreak Alerts ---
+export const getOutbreakAlerts = asyncHandler(async (req, res) => {
+  const fourteenDaysAgo = new Date();
+  fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+
+  const alerts = await DiseaseReport.aggregate([
+    {
+      $match: {
+        createdAt: { $gte: fourteenDaysAgo },
+        prediction: { $exists: true, $ne: 'Healthy' }
+      }
+    },
+    {
+      $lookup: {
+        from: 'users',
+        localField: 'farmer',
+        foreignField: '_id',
+        as: 'farmerDetails'
+      }
+    },
+    { $unwind: '$farmerDetails' },
+    {
+      $group: {
+        _id: {
+          district: { $ifNull: ['$farmerDetails.address.district', 'Unknown'] },
+          disease: '$prediction'
+        },
+        count: { $sum: 1 },
+        lastDetected: { $max: '$createdAt' },
+        farmers: { $addToSet: '$farmerDetails.fullName' }
+      }
+    },
+    { $match: { count: { $gte: 2 } } }, // Threshold of 2 for demo/test, usually 5+
+    { $sort: { count: -1 } }
+  ]);
+
+  res.json(alerts);
 });

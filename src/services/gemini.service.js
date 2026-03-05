@@ -679,3 +679,61 @@ All text in ${langName}. Use ASCII digits. No markdown.`;
 
   return normalizeAndParseJSON(response.choices[0].message.content);
 };
+// ─────────────────────────────────────────────────────────────────────────────
+//  7. GOVERNMENT SCHEMES RECOMMENDATION
+// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * @param {object} user - User profile data
+ * @param {string} language - "en" | "hi" | "mr"
+ */
+export const getRecommendedSchemes = async (user, language = "en", userApiKey = null) => {
+  const client = createClient(userApiKey);
+  const langName = LANGUAGE_NAMES[language] || "English";
+  const today = new Date().toISOString().slice(0, 10);
+
+  const prompt = `You are a specialized Indian Government Schemes advisor for farmers.
+Current Date: ${today}
+
+Context of the Farmer:
+- Name: ${user.fullName}
+- Location: ${user.address?.taluka}, ${user.address?.district}
+- Farm Size: ${user.farmInfo?.totalArea?.value} ${user.farmInfo?.totalArea?.unit}
+- Crops: ${user.farmInfo?.primaryCrops?.join(", ")}
+- Irrigation: ${user.farmInfo?.irrigationType}
+- Soil: ${user.farmInfo?.soilType}
+
+Your task is to recommend 5 highly relevant, REAL, and CURRENT (March 2026) Indian Government agriculture schemes for this specific farmer.
+Use the following real schemes if they fit: PM-KISAN, PMFBY (Crop Insurance), Kisan Credit Card (KCC), PM-KUSUM (Solar Pumps), Soil Health Card, PKVY (Organic Farming), Agriculture Infrastructure Fund (AIF).
+
+Return ONLY a valid JSON object (no markdown, no code fences):
+{
+  "recommendations": [
+    {
+      "id": "unique-slug",
+      "title": "Scheme Name in ${langName}",
+      "shortDescription": "1-sentence catchy description in ${langName}",
+      "benefits": ["Benefit 1 in ${langName}", "Benefit 2"],
+      "eligibility": "Who can apply based on this farmer's profile in ${langName}",
+      "documentsRequired": ["Aadhaar Card", "Land records", "Bank Passbook", "..."],
+      "applicationSteps": ["Step 1 in ${langName}", "Step 2", "..."],
+      "lastDate": "Real or estimated last date (e.g. 31 March 2026) in ${langName}",
+      "websiteUrl": "Actual direct scheme application URL (not just portal)",
+      "officialPortal": "Official government portal URL",
+      "imageUrl": "4-5 descriptive English keywords for a high-quality, professional image representing this scheme (e.g. 'modern solar panel farm field', 'indian woman farmer receiving gold coins', 'soil testing laboratory equipment', 'organic vegetable harvest indian farmer')",
+      "tags": ["Subsidy", "Insurance", "Solar", "..." ],
+      "relevanceReason": "Why this specific scheme is good for this farmer specifically in ${langName}"
+    }
+  ],
+  "summary": "Short 2-sentence encouraging summary in ${langName} for ${user.fullName}"
+}
+All text values must be in ${langName}. Use ASCII digits. Be highly specific and helpful.`;
+
+  const response = await client.chat.completions.create({
+    model: "llama-3.3-70b-versatile",
+    messages: [{ role: "user", content: prompt }],
+    temperature: 0.5,
+    max_tokens: 2500,
+  });
+
+  return normalizeAndParseJSON(response.choices[0].message.content);
+};

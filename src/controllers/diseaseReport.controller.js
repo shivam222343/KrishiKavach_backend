@@ -4,6 +4,7 @@ import Crop from "../models/crop.model.js";
 import Media from "../models/media.model.js";
 import { uploadToCloudinary } from "../services/cloudinary.service.js";
 import { analyzeCropDisease, identifyCropWithAI } from "../services/diseaseDetection.service.js";
+import { sendWhatsAppReport } from "../services/whatsapp.service.js";
 import axios from "axios";
 import FormData from "form-data";
 
@@ -248,6 +249,23 @@ export const detectDiseaseML = asyncHandler(async (req, res) => {
         createdAt: report.createdAt,
       },
     });
+
+    // ── WhatsApp Automation (Background) ──
+    try {
+      if (req.user.mobileNumber) {
+        sendWhatsAppReport({
+          to: req.user.mobileNumber,
+          farmerName: req.user.fullName,
+          cropName: normalizedCrop,
+          diseaseName: prediction,
+          confidence: confidence,
+          imageURL: report.imageURL,
+          summary: mlData.details?.diagnosis || "",
+        });
+      }
+    } catch (wsErr) {
+      console.error("[WhatsApp] Automation trigger failed:", wsErr.message);
+    }
 
   } catch (error) {
     console.error("ML prediction error:", error.message);

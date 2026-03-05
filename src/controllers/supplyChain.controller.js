@@ -12,7 +12,7 @@ const _axios = axios;
  */
 export const createListing = async (req, res) => {
     try {
-        const { 
+        const {
             cropType, quantity, unit, price, availabilityDate, longitude, latitude, description,
             city, yieldAmount, neededAmount, destinationName, preferredTransport, contactPhone,
             destinationLongitude, destinationLatitude, listingImage
@@ -145,10 +145,22 @@ export const updateRequestStatus = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Request not found' });
         }
 
+        if (request.status !== 'Pending') {
+            return res.status(400).json({ success: false, message: 'Request already processed' });
+        }
+
         request.status = status;
 
         if (status === 'Accepted') {
-            // Mark the listing as Sold/Collaborated so it doesn't show for others
+            // Check if chat already exists for this request (extra safety)
+            const existingChat = await CollaborationChat.findOne({ requestId: request._id });
+            if (existingChat) {
+                request.chatId = existingChat._id;
+                await request.save();
+                return res.status(200).json({ success: true, data: existingChat });
+            }
+
+            // Mark the listing as Sold/Collaborated
             await SupplyChainListing.findByIdAndUpdate(request.listingId, { status: 'Sold' });
 
             // Create chat room
@@ -166,17 +178,27 @@ export const updateRequestStatus = async (req, res) => {
 
         await request.save();
 
+        let responseData = request;
+        if (status === 'Accepted' && request.chatId) {
+            responseData = await CollaborationChat.findById(request.chatId)
+                .populate('participants', 'fullName')
+                .populate({
+                    path: 'requestId',
+                    populate: { path: 'listingId' }
+                });
+        }
+
         // Emit real-time notification to the sender
         const io = req.app.get('socketio');
         if (io) {
             io.emit(`notification_${request.senderId}`, {
                 type: 'REQUEST_UPDATE',
                 message: `Your collaboration request was ${status}`,
-                data: request
+                data: responseData
             });
         }
 
-        res.status(200).json({ success: true, data: request });
+        res.status(200).json({ success: true, data: responseData });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -187,11 +209,17 @@ export const updateRequestStatus = async (req, res) => {
  */
 export const getMyCollaborations = async (req, res) => {
     try {
-        const requestsReceived = await CollaborationRequest.find({ receiverId: req.user.id })
+        const requestsReceived = await CollaborationRequest.find({
+            receiverId: req.user.id,
+            status: 'Pending'
+        })
             .populate('senderId', 'fullName mobileNumber')
             .populate('listingId');
 
-        const requestsSent = await CollaborationRequest.find({ senderId: req.user.id })
+        const requestsSent = await CollaborationRequest.find({
+            senderId: req.user.id,
+            status: 'Pending'
+        })
             .populate('receiverId', 'fullName mobileNumber')
             .populate('listingId');
 
@@ -220,8 +248,8 @@ export const getMyCollaborations = async (req, res) => {
  */
 export const getExternalProcessingCenters = async (req, res) => {
     try {
-        const { latitude, longitude, radius = 50, city } = req.query; 
-        
+        const { latitude, longitude, radius = 50, city } = req.query;
+
         // 1. Search locally in our DB first
         let localCenters = [];
         if (latitude && longitude) {
@@ -237,9 +265,9 @@ export const getExternalProcessingCenters = async (req, res) => {
 
         // 2. Call our Python Hybrid Service (Scraper + OSM)
         const pythonServiceUrl = `http://localhost:8000/search-facilities?lat=${latitude}&lon=${longitude}&radius=${radius}${city ? `&city=${city}` : ''}`;
-        
+
         console.log(`[*] Fetching hybrid facilities from: ${pythonServiceUrl}`);
-        
+
         let externalResults = [];
         try {
             const response = await _axios.get(pythonServiceUrl);
@@ -248,6 +276,8 @@ export const getExternalProcessingCenters = async (req, res) => {
 
                 // 3. Persist external results to DB for future use
                 for (const center of externalResults) {
+                    if (!center.id) continue; // Skip if no valid external ID to prevent unique index violation
+
                     await ProcessingCenter.findOneAndUpdate(
                         { externalId: center.id },
                         {
@@ -259,14 +289,14 @@ export const getExternalProcessingCenters = async (req, res) => {
                             source: center.source,
                             location: {
                                 type: "Point",
-                                coordinates: center.location 
+                                coordinates: center.location
                             },
                             lastUpdated: new Date()
                         },
                         { upsert: true, new: true }
                     );
                 }
-                
+
                 // Refresh local search to include newly added ones
                 localCenters = await ProcessingCenter.find({
                     location: {
@@ -280,8 +310,8 @@ export const getExternalProcessingCenters = async (req, res) => {
         } catch (err) {
             console.error("[-] Python Service Error:", err.message);
             if (localCenters.length === 0) {
-                 // Fallback to absolute minimal if even DB is empty and service is down
-                 localCenters = [{
+                // Fallback to absolute minimal if even DB is empty and service is down
+                localCenters = [{
                     id: 'fallback_1',
                     name: 'Rajashri Shahu Ginning (Fallback)',
                     type: 'Processing Center',
@@ -294,9 +324,9 @@ export const getExternalProcessingCenters = async (req, res) => {
             }
         }
 
-        res.status(200).json({ 
-            success: true, 
-            count: localCenters.length, 
+        res.status(200).json({
+            success: true,
+            count: localCenters.length,
             data: localCenters.map(c => ({
                 id: c.externalId || c._id,
                 _id: c._id,

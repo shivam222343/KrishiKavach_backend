@@ -82,9 +82,17 @@ export const listFacilities = asyncHandler(async (req, res) => {
 });
 
 export const addFacility = asyncHandler(async (req, res) => {
-  const { name, type, location, city, contact, images, marketPrices } = req.body;
+  const { name, type, location, city, contact, images, marketPrices, externalId } = req.body;
   const facility = await ProcessingCenter.create({
-    name, type, location, city, contact, images, marketPrices, source: 'Admin'
+    name,
+    type,
+    location,
+    city,
+    contact,
+    images,
+    marketPrices,
+    source: 'Admin',
+    externalId: externalId || `adm_${Date.now()}`
   });
   res.status(201).json(facility);
 });

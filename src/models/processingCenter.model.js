@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 const processingCenterSchema = new mongoose.Schema({
-    externalId: { type: String, unique: true }, // OSM ID or Scraped ID
+    externalId: { type: String, unique: true, sparse: true }, // OSM ID or Scraped ID
     name: { type: String, required: true },
     type: { type: String, default: 'Processing Center' },
     location: {

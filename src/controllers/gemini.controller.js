@@ -23,7 +23,7 @@ export const fetchCropDiseaseInfo = asyncHandler(async (req, res) => {
     const results = await Promise.allSettled([
         getCropDiseaseInfo(cropName, diseaseName, language, user?.groqApiKey),
         (async () => {
-            const ML_SERVER_URL = process.env.ML_SERVER_URL || "http://localhost:8000";
+            const ADVISORY_URL = process.env.ADVISORY_URL || "https://shivamdombe-appadvisory.hf.space";
             const langMap = { en: "English", hi: "Hindi", mr: "Marathi" };
             const languageName = langMap[language] || "English";
 
@@ -32,7 +32,7 @@ export const fetchCropDiseaseInfo = asyncHandler(async (req, res) => {
             fd.append("language", languageName);
             fd.append("max_duration", "20");
 
-            const mlRes = await axios.post(`${ML_SERVER_URL}/youtube-search`, fd, {
+            const mlRes = await axios.post(`${ADVISORY_URL}/youtube-search`, fd, {
                 headers: fd.getHeaders(),
                 timeout: 12000
             });
@@ -40,7 +40,7 @@ export const fetchCropDiseaseInfo = asyncHandler(async (req, res) => {
             return mlRes.data?.success ? mlRes.data.videos : [];
         })(),
         (async () => {
-            const ML_SERVER_URL = process.env.ML_SERVER_URL || "http://localhost:8000";
+            const ADVISORY_URL = process.env.ADVISORY_URL || "https://shivamdombe-appadvisory.hf.space";
             const langMap = { en: "English", hi: "Hindi", mr: "Marathi" };
             const languageName = langMap[language] || "English";
 
@@ -49,7 +49,7 @@ export const fetchCropDiseaseInfo = asyncHandler(async (req, res) => {
             fd.append("language", languageName);
             fd.append("max_duration", "20");
 
-            const mlRes = await axios.post(`${ML_SERVER_URL}/youtube-search`, fd, {
+            const mlRes = await axios.post(`${ADVISORY_URL}/youtube-search`, fd, {
                 headers: fd.getHeaders(),
                 timeout: 12000
             });

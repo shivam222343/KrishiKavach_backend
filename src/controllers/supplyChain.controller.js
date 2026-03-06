@@ -4,7 +4,7 @@ import CollaborationChat from '../models/collaborationChat.model.js';
 import ProcessingCenter from '../models/processingCenter.model.js';
 import axios from 'axios';
 import { fetchNearbyFacilities } from '../services/places.service.js';
-const ML_SERVER_URL = process.env.ML_SERVER_URL || "https://krishikavach-ml.onrender.com";
+const ADVISORY_URL = process.env.ADVISORY_URL || "https://shivamdombe-appadvisory.hf.space";
 
 // Ensure axios is available globally in this module if default import fails
 const _axios = axios;
@@ -281,7 +281,7 @@ export const getExternalProcessingCenters = async (req, res) => {
             }
 
             // 3. Call Python Hybrid Service (Scraper + OSM)
-            const pythonServiceUrl = `${ML_SERVER_URL}/search-facilities?lat=${latitude}&lon=${longitude}&radius=${radius}${city ? `&city=${city}` : ''}`;
+            const pythonServiceUrl = `${ADVISORY_URL}/search-facilities?lat=${latitude}&lon=${longitude}&radius=${radius}${city ? `&city=${city}` : ''}`;
             try {
                 console.log(`[*] Triggering hybrid fetch: ${pythonServiceUrl}`);
                 const response = await _axios.get(pythonServiceUrl, { timeout: 15000 }); // Increase timeout to 15s for scraper

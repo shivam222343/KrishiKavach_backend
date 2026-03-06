@@ -11,9 +11,11 @@ import FormData from "form-data";
 import fs from "fs";
 
 // --------------------------------------------------------------
-// 🏠 LOCAL ML SERVER CONFIG (FastAPI running app.py on port 8000)
+// 🌐 HF SPACES CONFIG (3 separate microservices)
 // --------------------------------------------------------------
-const ML_SERVER_URL = process.env.ML_SERVER_URL || "https://krishikavach-ml.onrender.com";
+const ML_SERVICE_URL = process.env.ML_SERVICE_URL || "https://shivamdombe-ml-service.hf.space";
+const CROP_IDENTIFIER_URL = process.env.CROP_IDENTIFIER_URL || "https://shivamdombe-crop-identifier.hf.space";
+const ADVISORY_URL = process.env.ADVISORY_URL || "https://shivamdombe-appadvisory.hf.space";
 
 // Supported crops for the new model
 const SUPPORTED_CROPS = [
@@ -36,7 +38,7 @@ const requestPrediction = async ({ buffer, originalName, mimeType, cropName }) =
 
   if (cropName) formData.append("crop", cropName);
 
-  return axios.post(`${ML_SERVER_URL}/predict`, formData, {
+  return axios.post(`${ML_SERVICE_URL}/predict`, formData, {
     headers: formData.getHeaders(),
     timeout: 30000,
   });
@@ -246,7 +248,7 @@ export const detectDiseaseML = asyncHandler(async (req, res) => {
         fd.append("query", query);
         fd.append("language", languageName);
         fd.append("max_duration", "20");
-        const mlRes = await axios.post(`${ML_SERVER_URL}/youtube-search`, fd, { headers: fd.getHeaders(), timeout: 15000 });
+        const mlRes = await axios.post(`${ADVISORY_URL}/youtube-search`, fd, { headers: fd.getHeaders(), timeout: 30000 });
         return mlRes.data?.success ? mlRes.data.videos : [];
       })(),
       (async () => {
@@ -261,7 +263,7 @@ export const detectDiseaseML = asyncHandler(async (req, res) => {
         fd.append("query", query);
         fd.append("language", languageName);
         fd.append("max_duration", "20");
-        const mlRes = await axios.post(`${ML_SERVER_URL}/youtube-search`, fd, { headers: fd.getHeaders(), timeout: 15000 });
+        const mlRes = await axios.post(`${ADVISORY_URL}/youtube-search`, fd, { headers: fd.getHeaders(), timeout: 30000 });
         return mlRes.data?.success ? mlRes.data.videos : [];
       })(),
     ]);
@@ -354,14 +356,14 @@ export const identifyCropML = asyncHandler(async (req, res) => {
 
     // Fallback to local ML server if Gemini fails
     try {
-      console.log(`[*] Falling back to local ML Server: ${ML_SERVER_URL}/identify-crop`);
+      console.log(`[*] Falling back to Crop Identifier: ${CROP_IDENTIFIER_URL}/identify-crop`);
       const formData = new FormData();
       formData.append("file", req.file.buffer, {
         filename: req.file.originalname || "upload.jpg",
         contentType: req.file.mimetype || "image/jpeg",
       });
 
-      const mlResponse = await axios.post(`${ML_SERVER_URL}/identify-crop`, formData, {
+      const mlResponse = await axios.post(`${CROP_IDENTIFIER_URL}/identify-crop`, formData, {
         headers: formData.getHeaders(),
         timeout: 10000,
       });

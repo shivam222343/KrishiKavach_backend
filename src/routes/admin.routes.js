@@ -7,7 +7,7 @@ import {
   listFacilities, addFacility, updateFacility, deleteFacility,
   listSeeds, addSeed, updateSeed, deleteSeed,
   listFertilizers, addFertilizer, updateFertilizer, deleteFertilizer,
-  getOutbreakAlerts
+  getOutbreakAlerts, triggerScrape
 } from '../controllers/admin.controller.js';
 import { protect, authorizeRoles } from '../middleware/auth.middleware.js';
 
@@ -35,5 +35,7 @@ router.get('/fertilizers', listFertilizers);
 router.post('/fertilizers', addFertilizer);
 router.patch('/fertilizers/:id', updateFertilizer);
 router.delete('/fertilizers/:id', deleteFertilizer);
+
+router.post('/trigger-scrape', triggerScrape);
 
 export default router;

@@ -84,9 +84,9 @@ const startServer = async () => {
 
     server.timeout = 350000;
 
-    // 4. Schedule commodity scrape every 2 hours
-    console.log('📊 Market price scraper cron scheduled (every 2 hours)');
-    cron.schedule('0 */2 * * *', async () => {
+    // 4. Schedule commodity scrape daily at 12 PM and 12 AM
+    console.log('📊 Market price scraper cron scheduled (12 PM / 12 AM)');
+    cron.schedule('0 0,12 * * *', async () => {
       console.log('[Cron] Running commodity price scrape cycle...');
       try {
         const result = await runScrapeCycle();

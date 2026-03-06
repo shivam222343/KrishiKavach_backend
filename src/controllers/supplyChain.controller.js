@@ -3,6 +3,7 @@ import CollaborationRequest from '../models/collaborationRequest.model.js';
 import CollaborationChat from '../models/collaborationChat.model.js';
 import ProcessingCenter from '../models/processingCenter.model.js';
 import axios from 'axios';
+import { fetchNearbyFacilities } from '../services/places.service.js';
 const ML_SERVER_URL = process.env.ML_SERVER_URL || "http://localhost:8000";
 
 // Ensure axios is available globally in this module if default import fails
@@ -266,8 +267,25 @@ export const getExternalProcessingCenters = async (req, res) => {
             }).limit(50);
         }
 
-        // 2. Call our Python Hybrid Service (Scraper + OSM)
+        // 2. If DB results are low, fetch fresh data from Google Places (Primary for real facilities)
+        if (localCenters.length < 10 && latitude && longitude) {
+            console.log('[*] Low local results. Fetching fresh facilities from Google Places...');
+            await fetchNearbyFacilities(latitude, longitude, radius * 1000);
+
+            // Re-query local DB to include new Google results
+            localCenters = await ProcessingCenter.find({
+                location: {
+                    $near: {
+                        $geometry: { type: "Point", coordinates: [parseFloat(longitude), parseFloat(latitude)] },
+                        $maxDistance: radius * 1000
+                    }
+                }
+            }).limit(50);
+        }
+
+        // 3. Optional: Call our Python Hybrid Service (Scraper + OSM) for additional coverage
         const pythonServiceUrl = `${ML_SERVER_URL}/search-facilities?lat=${latitude}&lon=${longitude}&radius=${radius}${city ? `&city=${city}` : ''}`;
+        console.log(`[*] Checking hybrid facilities from: ${pythonServiceUrl}`);
 
         console.log(`[*] Fetching hybrid facilities from: ${pythonServiceUrl}`);
 
@@ -313,17 +331,7 @@ export const getExternalProcessingCenters = async (req, res) => {
         } catch (err) {
             console.error("[-] Python Service Error:", err.message);
             if (localCenters.length === 0) {
-                // Fallback to absolute minimal if even DB is empty and service is down
-                localCenters = [{
-                    id: 'fallback_1',
-                    name: 'Rajashri Shahu Ginning (Fallback)',
-                    type: 'Processing Center',
-                    location: [74.582, 16.852],
-                    city: 'Sangli',
-                    contact: '+91 98765 43210',
-                    image: 'https://images.unsplash.com/photo-1590633717560-49651582e3b2',
-                    source: 'Fallback'
-                }];
+                localCenters = [];
             }
         }
 

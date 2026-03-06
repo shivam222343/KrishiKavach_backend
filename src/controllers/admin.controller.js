@@ -7,6 +7,7 @@ import Seed from '../models/seed.model.js';
 import Fertilizer from '../models/fertilizer.model.js';
 import DiseaseReport from '../models/diseaseReport.model.js';
 import { deleteFromCloudinary } from '../services/cloudinary.service.js';
+import { runScrapeCycle } from '../services/market.service.js';
 
 const removeMediaById = async (mediaId) => {
   if (!mediaId) return;
@@ -188,4 +189,10 @@ export const getOutbreakAlerts = asyncHandler(async (req, res) => {
   ]);
 
   res.json(alerts);
+});
+
+// --- Trigger Market Scrape ---
+export const triggerScrape = asyncHandler(async (req, res) => {
+  const result = await runScrapeCycle();
+  res.json({ message: 'Scrape started successfully', result });
 });

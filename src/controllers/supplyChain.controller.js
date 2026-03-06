@@ -380,3 +380,46 @@ export const deleteListing = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
+
+/**
+ * Get all listings created by the current user
+ */
+export const getMyListings = async (req, res) => {
+    try {
+        const listings = await SupplyChainListing.find({ farmerId: req.user.id })
+            .sort({ createdAt: -1 });
+        res.status(200).json({ success: true, data: listings });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+/**
+ * Update listing status (e.g. to 'Sold' or 'Completed')
+ */
+export const updateListingStatus = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status } = req.body;
+
+        if (!['Active', 'Sold', 'Expired'].includes(status)) {
+            return res.status(400).json({ success: false, message: 'Invalid status' });
+        }
+
+        const listing = await SupplyChainListing.findById(id);
+        if (!listing) {
+            return res.status(404).json({ success: false, message: 'Listing not found' });
+        }
+
+        if (listing.farmerId.toString() !== req.user.id) {
+            return res.status(403).json({ success: false, message: 'Not authorized' });
+        }
+
+        listing.status = status;
+        await listing.save();
+
+        res.status(200).json({ success: true, data: listing });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};

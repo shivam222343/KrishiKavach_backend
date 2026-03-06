@@ -3,6 +3,7 @@ import { getCropDiseaseInfo, chatWithAI, getCropManagementInfo, getWeatherCropIm
 import axios from "axios";
 import FormData from "form-data";
 import User from "../models/user.model.js";
+import ProcessingCenter from "../models/processingCenter.model.js";
 
 /**
  * POST /api/v1/disease-info/crop-info
@@ -155,7 +156,44 @@ export const marketPrices = asyncHandler(async (req, res) => {
     }
 
     const user = await User.findById(req.user._id).lean();
-    const data = await getMarketPrices(commodity, district, state, user?.groqApiKey);
+    let data = await getMarketPrices(commodity, district, state, user?.groqApiKey);
+
+    // --- INTEGRATE FACILITY PRICES ---
+    try {
+        const userLoc = user?.location?.coordinates || [0, 0];
+        const nearbyFacilities = await ProcessingCenter.find({
+            location: {
+                $near: {
+                    $geometry: { type: "Point", coordinates: userLoc },
+                    $maxDistance: 100 * 1000 // 100km radius
+                }
+            },
+            "marketPrices.crop": { $regex: new RegExp(commodity, 'i') }
+        }).lean();
+
+        if (nearbyFacilities.length > 0) {
+            const facilityMarkets = nearbyFacilities.map(f => {
+                const cropPrice = f.marketPrices.find(p =>
+                    p.crop.toLowerCase().includes(commodity.toLowerCase())
+                );
+                return {
+                    marketName: f.name,
+                    modalPrice: cropPrice ? cropPrice.price : 0,
+                    district: f.city || "Nearby",
+                    distance: "Verified Facility",
+                    arrivalQty: "Direct",
+                    isFacility: true,
+                    contact: f.contact
+                };
+            }).filter(m => m.modalPrice > 0);
+
+            // Merge with localMarkets, prioritizing facilities at the top
+            data.localMarkets = [...facilityMarkets, ...(data.localMarkets || [])];
+        }
+    } catch (facilityErr) {
+        console.error("[Market] Facility integration failed:", facilityErr.message);
+    }
+
     res.json({ success: true, data });
 });
 

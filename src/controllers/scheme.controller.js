@@ -11,12 +11,21 @@ export const getSchemes = async (req, res) => {
         const language = req.query.lang || user.language || 'en';
         const schemes = await getRecommendedSchemes(user, language, user.groqApiKey);
 
+        // Safety check: Ensure we have a recommendations array
+        if (!schemes || !Array.isArray(schemes.recommendations)) {
+            console.error('[Schemes] Invalid AI response structure:', schemes);
+            return res.status(200).json({
+                summary: schemes?.summary || "Unable to fetch personalized schemes at this moment.",
+                recommendations: []
+            });
+        }
+
         // Pass descriptive keywords for the frontend to fetch specific images
         const enhancedSchemes = {
             ...schemes,
             recommendations: schemes.recommendations.map(s => ({
                 ...s,
-                imageKeywords: `farming,india,${s.imageUrl}`
+                imageKeywords: s.imageKeywords || `farming,india,${s.title}`
             }))
         };
 

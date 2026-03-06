@@ -4,19 +4,27 @@ import Crop from '../models/crop.model.js';
 // --- Add Crop ---
 export const addCrop = asyncHandler(async (req, res) => {
   const { cropName, cropVariety, plantingDate, area } = req.body;
+
+  // Ensure area is structured correctly for the model
+  const areaData = typeof area === 'object' ? area : { value: parseFloat(area), unit: 'acres' };
+
   const crop = await Crop.create({
     farmer: req.user.id,
     cropName,
     cropVariety,
     plantingDate,
-    area,
+    area: areaData,
   });
+
+  console.log(`[Crops] New crop added for user ${req.user.id}: ${cropName}`);
   res.status(201).json({ message: 'Crop added', crop });
 });
 
 // --- Get All Crops for Farmer ---
 export const getCrops = asyncHandler(async (req, res) => {
-  const crops = await Crop.find({ farmer: req.user.id });
+  console.log(`[Crops] Fetching crops for user ${req.user.id}...`);
+  const crops = await Crop.find({ farmer: req.user.id }).sort({ createdAt: -1 });
+  console.log(`[Crops] Found ${crops.length} crops for user ${req.user.id}`);
   res.json(crops);
 });
 

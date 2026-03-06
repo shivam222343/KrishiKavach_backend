@@ -4,6 +4,7 @@ import Crop from "../models/crop.model.js";
 import Media from "../models/media.model.js";
 import { uploadToCloudinary } from "../services/cloudinary.service.js";
 import { analyzeCropDisease, identifyCropWithAI } from "../services/diseaseDetection.service.js";
+import { getCropDiseaseInfo } from "../services/gemini.service.js";
 import { sendWhatsAppReport } from "../services/whatsapp.service.js";
 import axios from "axios";
 import FormData from "form-data";
@@ -12,10 +13,15 @@ import fs from "fs";
 // --------------------------------------------------------------
 // 🏠 LOCAL ML SERVER CONFIG (FastAPI running app.py on port 8000)
 // --------------------------------------------------------------
-const ML_SERVER_URL = process.env.ML_SERVER_URL || "http://localhost:8000";
+const ML_SERVER_URL = process.env.ML_SERVER_URL || "https://krishikavach-ml.onrender.com";
 
 // Supported crops for the new model
-const SUPPORTED_CROPS = ["Banana", "Chilli", "Radish", "Groundnut", "Cauliflower"];
+const SUPPORTED_CROPS = [
+  "Banana", "Chilli", "Radish", "Groundnut", "Cauliflower",
+  "Apple", "Blueberry", "Cherry", "Corn", "Grape",
+  "Orange", "Peach", "Pepper", "Potato", "Raspberry",
+  "Soybean", "Squash", "Strawberry", "Tomato"
+];
 
 // --------------------------------------------------------------
 // ✔ PREDICTION REQUEST TO LOCAL FASTAPI ML SERVER
@@ -155,28 +161,43 @@ export const detectDiseaseML = asyncHandler(async (req, res) => {
       }
     }
 
-    // --- Phase 2: AI Vision Fallback (Gemini/Groq) ---
+    // --- Phase 2: AI Vision Fallback (Gemini Expert) ---
     // Trigger if: low confidence, unknown result, or unsupported crop (like Corn)
     if (confidence < 50 || prediction === "Unknown" || !SUPPORTED_CROPS.includes(normalizedCrop)) {
       console.log(`[*] Low confidence (${confidence}%) or unsupported crop. Triggering AI Vision analysis...`);
       try {
-        // We need a path for analyzeCropDisease, so we save temp or use req.file
-        // Since analyzeCropDisease expects an array of file objects with .path, we create a temporary one
         const tempPath = `public/uploads/temp_${Date.now()}.jpg`;
         fs.writeFileSync(tempPath, req.file.buffer);
 
         const aiAnalysis = await analyzeCropDisease([{ path: tempPath }], { cropName: normalizedCrop }, req.user.language || "en");
 
         prediction = aiAnalysis.detectedDisease;
-        confidence = 95.0; // High confidence from LLM
+        confidence = 95.0;
         mlData.details = { diagnosis: aiAnalysis.diagnosis, recommendation: aiAnalysis.recommendation };
         isAiAnalyzed = true;
 
-        // Cleanup temp file
         fs.unlinkSync(tempPath);
       } catch (aiErr) {
         console.error("[AI] Vision analysis failed:", aiErr.message);
       }
+    }
+
+    // --- Phase 3: AI Advisory Retrieval (Gemini 1.5 Pro) ---
+    // Fetch detailed advisory for whatever disease was detected (by ML or AI)
+    try {
+      const lang = req.user.language || "en";
+      console.log(`[*] Fetching structured advisory for "${prediction}" in ${lang}...`);
+      const advisory = await getCropDiseaseInfo(normalizedCrop, prediction, lang);
+
+      // Override or merge details with the rich advisory
+      mlData.details = advisory;
+
+      // If AI vision was used, keep its diagnosis as 'expert_note'
+      if (isAiAnalyzed) {
+        mlData.details.expert_note = mlData.details.diagnosis || "";
+      }
+    } catch (advErr) {
+      console.error("[Advisory] Failed to fetch rich info:", advErr.message);
     }
 
     // Normalize confidence to 2 decimals
@@ -209,30 +230,44 @@ export const detectDiseaseML = asyncHandler(async (req, res) => {
     const languageName = langMap[lang] || "English";
     const groundingPrefix = lang === "mr" ? "शेती आणि पीक " : lang === "hi" ? "कृषि और फसल " : "Agriculture farming crop ";
 
-    // Parallel fetch recommendations
+    // Parallel fetch recommendations (Treatments & Yield)
     const videoResults = await Promise.allSettled([
       (async () => {
-        const query = `${groundingPrefix}${searchQuery} treatment control management`;
+        let suffix = "treatment control management organic pesticide";
+        if (friendlyPrediction.toLowerCase().includes("healthy")) {
+          suffix = "farming best practices growth boost organic fertilizers";
+        } else if (friendlyPrediction.toLowerCase().includes("not detected") || friendlyPrediction.toLowerCase() === "unknown") {
+          suffix = "plant care guide disease identification symptoms";
+        }
+        const query = `${groundingPrefix}${searchQuery} ${suffix}`;
+        console.log(`[YouTube] Fetching treatment videos for: "${query}"`);
+
         const fd = new FormData();
         fd.append("query", query);
         fd.append("language", languageName);
         fd.append("max_duration", "20");
-        const mlRes = await axios.post(`${ML_SERVER_URL}/youtube-search`, fd, { headers: fd.getHeaders(), timeout: 12000 });
+        const mlRes = await axios.post(`${ML_SERVER_URL}/youtube-search`, fd, { headers: fd.getHeaders(), timeout: 15000 });
         return mlRes.data?.success ? mlRes.data.videos : [];
       })(),
       (async () => {
-        const query = `${groundingPrefix}${normalizedCrop} yield recovery growth boost fertilizers`;
+        let suffix = "yield recovery growth boost fertilizers";
+        if (friendlyPrediction.toLowerCase().includes("healthy")) {
+          suffix = "increase production high yield secrets modern techniques";
+        }
+        const query = `${groundingPrefix}${searchQuery} ${suffix}`;
+        console.log(`[YouTube] Fetching yield videos for: "${query}"`);
+
         const fd = new FormData();
         fd.append("query", query);
         fd.append("language", languageName);
         fd.append("max_duration", "20");
-        const mlRes = await axios.post(`${ML_SERVER_URL}/youtube-search`, fd, { headers: fd.getHeaders(), timeout: 12000 });
+        const mlRes = await axios.post(`${ML_SERVER_URL}/youtube-search`, fd, { headers: fd.getHeaders(), timeout: 15000 });
         return mlRes.data?.success ? mlRes.data.videos : [];
-      })()
+      })(),
     ]);
 
-    const videos = videoResults[0].status === 'fulfilled' ? videoResults[0].value : [];
-    const recoveryVideos = videoResults[1].status === 'fulfilled' ? videoResults[1].value : [];
+    const videos = videoResults[0]?.status === 'fulfilled' ? videoResults[0].value : [];
+    const recoveryVideos = videoResults[1]?.status === 'fulfilled' ? videoResults[1].value : [];
 
     res.json({
       success: true,
@@ -299,16 +334,18 @@ export const identifyCropML = asyncHandler(async (req, res) => {
     // For debugging and tracking
     console.log(`[+] AI Result: Relevant=${aiResult.relevant}, Crop=${aiResult.detectedCrop} (${aiResult.confidence}%)`);
 
-    // Normalize detected crop name to match frontend IDs
+    // Normalize detected crop name to match frontend IDs accurately
     if (aiResult.detectedCrop) {
-      aiResult.detectedCrop = aiResult.detectedCrop
+      let crop = aiResult.detectedCrop
         .replace(/_\(maize\)/i, '')
         .replace(/,.*$/i, '')
         .replace(/_/g, ' ')
-        .split(' ')[0]; // Take first word (e.g. "Corn" from "Corn (maize)")
+        .trim();
 
-      // Capitalize
-      aiResult.detectedCrop = aiResult.detectedCrop.charAt(0).toUpperCase() + aiResult.detectedCrop.slice(1).toLowerCase();
+      // Capitalize first letter of each word to match frontend IDs (e.g., "Tomato", "Cauliflower")
+      aiResult.detectedCrop = crop.split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ');
     }
 
     res.json(aiResult);

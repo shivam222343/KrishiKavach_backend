@@ -1,7 +1,7 @@
 import axios from "axios";
 
 // 🏠 Local ML server (FastAPI running crop_project/app.py on port 8000)
-const ML_SERVER_URL = process.env.ML_SERVER_URL || "http://localhost:8000";
+const ML_SERVER_URL = process.env.ML_SERVER_URL || "https://krishikavach-ml.onrender.com";
 
 // ----------------------------------------------------------------------
 // 1️⃣ Check if local ML server is alive

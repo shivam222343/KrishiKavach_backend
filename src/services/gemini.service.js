@@ -179,9 +179,34 @@ export const getWeatherCropImpact = async (cropName, currentWeather, dailyForeca
   const model = createAIModel(userApiKey);
   const langName = LANGUAGE_NAMES[language] || "English";
 
-  const prompt = `Meteorologist: Impact of weather on ${cropName} in ${langName}.
-Current: ${JSON.stringify(currentWeather)}. Forecast: ${JSON.stringify(dailyForecast)}.
-Return JSON with detailed score, impacts, and weekly advisory.`;
+  const prompt = `Agricultural Meteorologist: Analyze the impact of weather on ${cropName} in ${langName} (${language}).
+Current Weather Data: ${JSON.stringify(currentWeather)}
+7-Day Forecast Data: ${JSON.stringify(dailyForecast)}
+
+Return ONLY valid JSON in this exact structure:
+{
+  "overallStatus": "Excellent" | "Good" | "Moderate" | "Caution" | "Critical",
+  "overallScore": number (0-100),
+  "overallMessage": "General summary sentence in ${langName}",
+  "impacts": [
+    {
+      "factor": "Temperature",
+      "currentValue": "28°C",
+      "status": "optimal" | "good" | "warning" | "danger",
+      "icon": "🌡️",
+      "impact": "Detailed explanation of impact in ${langName}",
+      "recommendation": "What to do in ${langName}"
+    },
+    { "factor": "Humidity", "currentValue": "65%", "status": "good", "icon": "💧", "impact": "...", "recommendation": "..." },
+    { "factor": "Wind", "currentValue": "12km/h", "status": "optimal", "icon": "💨", "impact": "...", "recommendation": "..." }
+  ],
+  "immediateActions": ["Action 1 in ${langName}", "Action 2 in ${langName}"],
+  "keyRisks": ["Risk 1 in ${langName}", "Risk 2 in ${langName}"],
+  "weeklyAdvisory": [
+    { "day": "Monday", "alertLevel": "info" | "warning" | "danger", "advice": "Advice for this day in ${langName}" }
+  ]
+}
+CRITICAL: Return ONLY JSON. Ensure all lists are non-empty arrays. Use ${langName} for all text.`;
 
   const result = await model.generateContent(prompt);
   return normalizeAndParseJSON(result.response.text());

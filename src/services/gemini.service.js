@@ -165,8 +165,35 @@ export const getCropManagementInfo = async (cropName, area, areaUnit, language =
   const model = createAIModel(userApiKey);
   const langName = LANGUAGE_NAMES[language] || "English";
 
-  const prompt = `Agricultural consultant: Guide for ${cropName} on ${area} ${areaUnit} in ${langName}. 
-Return JSON with full management lifecycle (Soil, Seed, Sowing, Irrigation, Fertilizers, Pest, Harvest, Cost/Profit).`;
+  const prompt = `Agricultural Expert: Provide a complete management guide for ${cropName} on ${area} ${areaUnit} in ${langName} (${language}).
+
+Return ONLY valid JSON in this exact structure:
+{
+  "cropName": "${cropName}",
+  "overview": "Brief overview in ${langName}",
+  "durationDays": number,
+  "bestSeason": "In ${langName}",
+  "estimatedCost": "Total cost for ${area} ${areaUnit} with currency",
+  "estimatedProfit": "Total profit for ${area} ${areaUnit} with currency",
+  "seedsRequired": "Recommended quantity/variety in ${langName}",
+  "sowingMethod": "Method in ${langName}",
+  "spacing": "Plant-to-plant and row-to-row spacing in ${langName}",
+  "soilRequirements": { "type": "...", "ph": "...", "preparation": ["Step 1", "Step 2"] },
+  "irrigation": { "frequency": "...", "method": "...", "criticalStages": ["Stage 1"] },
+  "fertilizers": [
+    { "name": "...", "quantity": "...", "timing": "...", "purpose": "..." }
+  ],
+  "growthStages": [
+    { "stage": "...", "duration": "...", "care": "..." }
+  ],
+  "pestControl": [
+    { "pest": "...", "symptoms": "...", "remedy": "..." }
+  ],
+  "harvest": { "duration": "...", "expectedYield": "...", "signs": "...", "method": "..." },
+  "tips": ["Tip 1", "Tip 2"],
+  "commonMistakes": ["Mistake 1", "Mistake 2"]
+}
+CRITICAL: Use standard numbers (0-9). Language: ${langName}.`;
 
   const result = await model.generateContent(prompt);
   return normalizeAndParseJSON(result.response.text());
@@ -247,32 +274,28 @@ export const getRecommendedSchemes = async (user, language = "en", userApiKey = 
   const model = createAIModel(userApiKey);
   const langName = LANGUAGE_NAMES[language] || "English";
 
-  const prompt = `
-    Agricultural Govt Advisor: Provide 5 tailored government schemes for farmer "${user.fullName}" 
-    living in "${user.address?.district || 'India'}". 
-    Context: The farmer is looking for support in ${language === 'mr' ? 'Marathi' : language === 'hi' ? 'Hindi' : 'English'}.
-    
-    Return ONLY valid JSON in this structure:
+  const prompt = `Agricultural Govt Advisor: Provide 5 tailored government schemes for farmer "${user.fullName}" living in "${user.address?.district || 'India'}". 
+Return ONLY valid JSON in this exact structure:
+{
+  "summary": "Contextual overview in ${langName}",
+  "recommendations": [
     {
-      "summary": "A brief overview (2 sentences) of how these schemes help this specific farmer.",
-      "recommendations": [
-        {
-          "id": "unique_string_id",
-          "title": "Full Scheme Name",
-          "shortDescription": "20-word summary",
-          "tags": ["Subsidy", "Irrigation", "Technology"],
-          "lastDate": "D-M-YYYY or 'Ongoing'",
-          "eligibility": "Who can apply?",
-          "relevanceReason": "Why this matches this farmer's profile?",
-          "benefits": ["Benefit 1", "Benefit 2"],
-          "documentsRequired": ["Aadhaar", "Land Records"],
-          "applicationSteps": ["Step 1", "Step 2"],
-          "websiteUrl": "https://pib.gov.in"
-        }
-      ]
+      "id": "unique_string_id",
+      "title": "Full Scheme Name",
+      "shortDescription": "20-word summary in ${langName}",
+      "tags": ["Subsidy", "Irrigation"],
+      "lastDate": "D-M-YYYY or 'Ongoing'",
+      "eligibility": "Description in ${langName}",
+      "relevanceReason": "Why this matches in ${langName}",
+      "benefits": ["Benefit 1", "Benefit 2"],
+      "documentsRequired": ["Aadhaar", "Land Records"],
+      "applicationSteps": ["Step 1", "Step 2"],
+      "websiteUrl": "https://gov.in",
+      "imageKeywords": "Thematic keywords (comma-separated, in English) like 'solar pump, agriculture, india'"
     }
-    All content (except keys/URLs) MUST be in ${langName}.
-  `;
+  ]
+}
+CRITICAL: All content (except keys/URLs/keywords) MUST be in ${langName}. Use English for imageKeywords.`;
 
   const result = await model.generateContent(prompt);
   return normalizeAndParseJSON(result.response.text());
